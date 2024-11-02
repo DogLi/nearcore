@@ -597,7 +597,10 @@ impl JsonRpcHandler {
         let (tx_hash, account_id) = tx_info.to_tx_hash_and_account();
         let mut tx_status_result =
             Err(near_jsonrpc_primitives::types::transactions::RpcTransactionError::TimeoutError);
-        timeout(self.polling_config.polling_timeout, async {
+        let now = std::time::Instant::now();
+        info!("xxxxxxxx: start to get tx_status_result...");
+        let timeout_secs = 30;
+        timeout(Duration::from_secs(timeout_secs), async {
             loop {
                 tx_status_result = self.view_client_send( TxStatus {
                     tx_hash,
@@ -605,6 +608,7 @@ impl JsonRpcHandler {
                     fetch_receipt,
                 })
                 .await;
+                info!("xxxxxxxx: tx_status_result: {:?}, use: {:?}", tx_status_result, now.elapsed());
                 match tx_status_result.clone() {
                     Ok(result) => {
                         if tx_execution_status_meets_expectations(&finality, &result.status) {
@@ -638,6 +642,7 @@ impl JsonRpcHandler {
         .await
         .map_err(|_| {
             metrics::RPC_TIMEOUT_TOTAL.inc();
+            tracing::warn!("xxxxxxxxxxxxxxxxx: tx_status_fetch timeout: use {:?}", now.elapsed());
             tracing::warn!(
                 target: "jsonrpc", "Timeout: tx_status_fetch method. tx_info {:?} fetch_receipt {:?} result {:?} timeout {:?}",
                 tx_info,
